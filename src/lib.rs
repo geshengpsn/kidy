@@ -1,9 +1,10 @@
-//! # kidy is ky and dy
-//! A library for kinematics and dynamics of robotics.
+//! # kidy is a library for kinematics and dynamics of multi-body.
+//! kidy = kinematics + dynamics
 
-#![cfg_attr(not(test), no_std)]
+// #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
 mod dynamics;
 mod kinematics;
+mod multi_body;

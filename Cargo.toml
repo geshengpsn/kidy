@@ -7,7 +7,12 @@ edition = "2021"
 
 [dependencies]
 liealg = { path = "../liealg" }
-
-
-[dev-dependencies]
 approx = "0.5.1"
+nalgebra = "0.33.0"
+num-traits = "0.2.19"
+robot-parse = { path = "../robot-parse" }
+petgraph = "0.6"
+urdf-rs = "0.9.0"
+rerun = "0.18.2"
+obj-rs = "0.7.4"
+color-name = "1.1.0"

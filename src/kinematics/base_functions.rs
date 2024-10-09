@@ -1,5 +1,3 @@
-// pub mod base_functions;
-
 // use std::simd::StdFloat;
 use liealg::prelude::*;
 use liealg::Vec6;
