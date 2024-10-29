@@ -15,6 +15,9 @@ use urdf_rs::{read_file, read_from_string, Vec3};
 
 pub use urdf_rs;
 
+mod multibody;
+mod visualizer;
+
 #[derive(Debug)]
 pub struct Link {
     pub joint: Option<urdf_rs::Joint>,
@@ -32,7 +35,6 @@ pub struct MultiBodyGraph {
     pub root_index: usize,
     pub leafs_index: Vec<usize>,
     pub name: String,
-    pub material: Vec<urdf_rs::Material>,
 }
 
 impl MultiBodyGraph {
@@ -208,7 +210,6 @@ fn parse_robot(robot: urdf_rs::Robot) -> MultiBodyGraph {
         graph,
         link_map,
         name: robot.name,
-        material: robot.materials,
         root_index: root,
         leafs_index: leafs,
     };

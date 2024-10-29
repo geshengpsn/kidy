@@ -9,9 +9,9 @@ use nalgebra::SVector;
 use nalgebra::Vector3;
 use nalgebra::Vector6;
 
-pub(crate) struct Chain<F: Real, const N: usize> {
-    pub(crate) joints_screw: [Vec6<F>; N],
-    pub(crate) zero: SE3<F>,
+pub(crate) struct KiChain<const N:usize> {
+    pub(crate) joints_screw: [Vec6<f64>; N],
+    pub(crate) zero: SE3<f64>,
 }
 
 #[derive(Debug)]
@@ -20,18 +20,18 @@ pub(crate) enum IkError {
     MaxIter,
 }
 
-impl<F: Real, const N: usize> Chain<F, N> {
-    pub(crate) fn fk(&self, joints: &[F; N]) -> SE3<F> {
-        let mut pose = SE3::<F>::identity();
+impl<const N:usize> KiChain<N> {
+    pub(crate) fn fk(&self, joints: &[f64; N]) -> SE3<f64> {
+        let mut pose = SE3::<f64>::identity();
         for (joint, screw) in joints.iter().zip(self.joints_screw.iter()) {
             pose *= (screw.hat() * joint).exp();
         }
         pose * &self.zero
     }
 
-    pub(crate) fn jacobian(&self, joints: &[F]) -> SMatrix<F, 6, N> {
-        let mut jacobian = SMatrix::<F, 6, N>::zeros();
-        let mut pose = SE3::<F>::identity();
+    pub(crate) fn jacobian(&self, joints: &[f64]) -> SMatrix<f64, 6, N> {
+        let mut jacobian = SMatrix::<f64, 6, N>::zeros();
+        let mut pose = SE3::<f64>::identity();
         for (i, (joint, screw)) in joints.iter().zip(self.joints_screw.iter()).enumerate() {
             let jn = screw;
             let jn = pose.adjoint().act(&jn.hat()).vee();
@@ -43,9 +43,8 @@ impl<F: Real, const N: usize> Chain<F, N> {
         jacobian
     }
 
-    pub(crate) fn ik(&self, target_pose: &SE3<F>, init_joints: &[F; N], r_error: F, p_error: F, pinv_eps: F, max_time: usize) -> Result<([F; N],usize), IkError>
+    pub(crate) fn ik(&self, target_pose: &SE3<f64>, init_joints: &[f64; N], r_error: f64, p_error: f64, pinv_eps: f64, max_time: usize) -> Result<([f64; N],usize), IkError>
     where
-        F: nalgebra::RealField,
         nalgebra::Const<6>: nalgebra::DimMin<nalgebra::Const<N>>,
         nalgebra::Const<N>: nalgebra::ToTypenum,
         <nalgebra::Const<6> as nalgebra::DimMin<nalgebra::Const<N>>>::Output: nalgebra::DimSub<nalgebra::Const<1>>,
@@ -72,7 +71,7 @@ impl<F: Real, const N: usize> Chain<F, N> {
                 return Err(IkError::PseudoInverse);
             };
             let v = Vector6::from_row_slice(vs.as_slice());
-            let update: SVector<F, N> = pinv_j * v;
+            let update: SVector<f64, N> = pinv_j * v;
             println!("pinv: {pinv_j:.5} update:{update}");
             for (j, u) in current_joints.iter_mut().zip(update.iter()) {
                 *j += *u;
@@ -92,7 +91,7 @@ mod test {
 
     #[test]
     fn test_fk() {
-        let chain = Chain {
+        let chain = KiChain {
             joints_screw: [
                 Vec6::new([0., 0., 1.], [0., 0., 0.]),
                 Vec6::new([0., 0., 1.], [0., -1., 0.]),
@@ -110,7 +109,7 @@ mod test {
 
     #[test]
     fn test_jacobian() {
-        let chain = Chain {
+        let chain = KiChain {
             joints_screw: [
                 Vec6::new([0., 0., 1.], [0., 0.2, 0.2]),
                 Vec6::new([1., 0., 0.], [2., 0., 3.]),
@@ -152,7 +151,7 @@ mod test {
 
     #[test]
     fn test_ik() {
-        let chain = Chain {
+        let chain = KiChain {
             joints_screw: [
                 Vec6::new([0., 0., 1.], [4., 0., 0.]),
                 Vec6::new([0., 0., 0.], [0., 1., 0.]),
