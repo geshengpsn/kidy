@@ -18,7 +18,7 @@ impl<const N: usize> KidyChain<N> {
         for (joint, screw) in joints.iter().zip(self.joints_screw.iter()) {
             pose *= (screw.clone() * joint).exp();
         }
-        pose * &self.zero_ee_pose()
+        pose * &self.zero_pose
     }
 
     pub fn jacobian(&self, joints: &[f64]) -> SMatrix<f64, 6, N> {
@@ -34,7 +34,8 @@ impl<const N: usize> KidyChain<N> {
         }
         jacobian
     }
-
+    
+    // todo: joint limits + zero space ik
     pub fn ik(&self, target_pose: &SE3<f64>, init_joints: &[f64; N], r_error: f64, p_error: f64, pinv_eps: f64, max_time: usize) -> Result<([f64; N],usize), IkError>
     where
         nalgebra::Const<6>: nalgebra::DimMin<nalgebra::Const<N>>,

@@ -6,13 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-liealg = { path = "../liealg" }
+liealg = "0.4.0"
 approx = "0.5.1"
-nalgebra = "0.33.0"
+nalgebra = "0.33.2"
 num-traits = "0.2.19"
-robot-parse = { path = "../robot-parse" }
+# robot-parse = { path = "../robot-parse" }
 petgraph = "0.6"
 urdf-rs = "0.9.0"
-rerun = "0.18.2"
-obj-rs = "0.7.4"
-color-name = "1.1.0"

@@ -1,125 +1,101 @@
-mod jacobian;
+use crate::KidyChain;
+use liealg::{prelude::*, se3, AdjSE3, Vec6};
+use nalgebra::{Matrix3, Matrix6, Vector3, Vector6};
 
-use liealg::{prelude::*, Vec6, SE3};
+impl<const N: usize> KidyChain<N> {
+    // tau = M(q) * q_dot_dot + C(q, q_dot) * q_dot + G(q)
+    fn id(
+        &self,
+        theta: [f64; N],
+        dtheta: [f64; N],
+        ddtheta: [f64; N],
+        gravity: [f64; 3],
+        f_tip: se3<f64>,
+    ) -> [f64; N] {
+        let mut twists = vec![se3::new([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]); N + 1];
+        let mut dtwists = vec![se3::new([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]); N + 1];
 
-use self::jacobian::{jacobian, Jacobian};
+        // add gravity
+        let g = se3::new([0.0, 0.0, 0.0], gravity);
+        dtwists[0] = g;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum FkError {}
+        // i^T_i-1
+        for i in 1..N + 1 {
+            // i^T_i-1: transformation from i to i-1
+            let t = (self.local_screw[i - 1].clone() * -theta[i - 1]).exp()
+                * self.local_zero_pose[i].clone().inv();
 
-pub fn fk<T: Real, const N: usize>(
-    m: &SE3<T>,
-    s_list: &[Vec6<T>; N],
-    theta_list: &[T; N],
-) -> Result<SE3<T>, FkError> {
-    Ok(s_list
-        .iter()
-        .rev()
-        .cloned()
-        .zip(theta_list.iter().rev())
-        .fold(m.clone(), |acc, (s, theta)| {
-            (s * *theta).hat().exp().mat_mul(&acc)
-        }))
-}
+            // V_i: twist of link i
+            let v =
+                t.adjoint().act(&twists[i - 1]) + self.local_screw[i - 1].clone() * dtheta[i - 1];
+            twists[i] = v.clone();
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum IkError {
-    FKError(FkError),
-    InvalidInput,
-}
-
-impl From<FkError> for IkError {
-    fn from(e: FkError) -> Self {
-        Self::FKError(e)
-    }
-}
-
-#[derive(Debug)]
-pub struct IkSolveParam<T: PartialEq + Real> {
-    r_error: T,
-    p_error: T,
-    max_iter: usize,
-}
-
-impl<T: PartialEq + Real> Default for IkSolveParam<T> {
-    fn default() -> Self {
-        Self {
-            r_error: T::epsilon(),
-            p_error: T::epsilon(),
-            max_iter: 100,
+            // dV_i: acceleration of link i
+            let dv = t.adjoint().act(&dtwists[i - 1])
+                + bracket(v, self.local_screw[i - 1].clone()) * dtheta[i - 1]
+                + self.local_screw[i - 1].clone() * ddtheta[i - 1];
+            dtwists[i] = dv;
         }
-    }
-}
 
-fn norm<T: Real>(v: &[T; 3]) -> T
-// where for<'a> &'a T: core::ops::Mul<&'a T>
-{
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
-}
-
-pub fn ik<T: Real + PartialEq, const N: usize>(
-    m: &SE3<T>,
-    s_list: &[Vec6<T>; N],
-    theta_list: &mut [T; N],
-    target: &SE3<T>,
-    ik_solve_param: IkSolveParam<T>,
-) -> Result<usize, IkError> {
-    // f(θ') = f(θ) + J(θ)(θ'-θ)
-    // f(θ') - f(θ) = J(θ)(θ'-θ)
-    // θ' = θ + J⁻¹(θ)(f(θ') - f(θ))
-    let mut i = 0;
-    loop {
-        // T_s_tip
-        let tip = fk(m, s_list, theta_list)?;
-        // Te = T_tip_target = T_s_tip⁻¹ * T_s_target
-        let e = tip.inv().mat_mul(target);
-        let e = e.log().vee();
-        if norm(&e.p()) < ik_solve_param.p_error && norm(&e.r()) < ik_solve_param.r_error {
-            return Ok(i);
+        let mut wrenchs = vec![se3::new([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]); N + 1];
+        wrenchs[N] = f_tip;
+        let tau = [0.0; N];
+        for i in (1..N + 1).rev() {
+            let t = (self.local_screw[i].clone() * -theta[i - 1]).exp()
+                * self.local_zero_pose[i + 1].clone().inv();
+            // t.adjoint().transpose().act(&wrenchs[i + 1]) + inertial_mul_dtwist(g, v) - ad(v).transpose().;
+            // wrenchs[i] = wrenchs[i + 1] +
+            // tau[i - 1] =
         }
-        let j = jacobian(s_list, theta_list);
-        i += 1;
+        tau
     }
+
+    // M(q)^-1 * (tau - C(q, q_dot) * q_dot - G(q)) = q_dot_dot
+    fn fd(&self) {
+        println!("KidyChain fd");
+    }
+}
+
+fn ad(v: se3<f64>) -> Matrix6<f64> {
+    let v = v.vee().as_array();
+    let p = Vector3::new(v[0], v[1], v[2]);
+    let w = Vector3::new(v[3], v[4], v[5]);
+    let a = liealg::hat(&p);
+    let b = liealg::hat(&w);
+    let mut res = Matrix6::zeros();
+    res.view_mut((0, 0), (3, 3)).copy_from(&a);
+    res.view_mut((3, 3), (3, 3)).copy_from(&a);
+    res.view_mut((3, 0), (3, 3)).copy_from(&b);
+    res
+}
+
+fn bracket(v: se3<f64>, w: se3<f64>) -> se3<f64> {
+    let m = ad(v);
+    let vec6 = Vector6::from_column_slice(w.vee().as_slice());
+    let res = m * vec6;
+    se3::new([res[0], res[1], res[2]], [res[3], res[4], res[5]])
+}
+
+fn inertial_mul_twist(g: Matrix6<f64>, v: se3<f64>) -> se3<f64> {
+    let vec6 = Vector6::from_column_slice(v.vee().as_slice());
+    let res = g * vec6;
+    se3::new([res[0], res[1], res[2]], [res[3], res[4], res[5]])
+}
+
+fn inertial_mul_dtwist(g: Matrix6<f64>, dv: se3<f64>) -> se3<f64> {
+    let vec6 = Vector6::from_column_slice(dv.vee().as_slice());
+    let res = g * vec6;
+    se3::new([res[0], res[1], res[2]], [res[3], res[4], res[5]])
 }
 
 #[cfg(test)]
 mod test {
-    use core::f64::consts::FRAC_PI_2;
-
     use super::*;
-    use approx::*;
-    use liealg::{Vec6, SO3};
 
     #[test]
-    fn test_fk() {
-        let m = (Vec6::new([0., 0., 0.], [1., 0., 0.]) * 2.).hat().exp();
-        let s_list = [
-            Vec6::new([0., 0., 1.], [0., 0., 0.]),
-            Vec6::new([0., 0., 1.], [0., -1., 0.]),
-        ];
-        let theta_list = [0., FRAC_PI_2];
-        let res = fk(&m, &s_list, &theta_list).unwrap();
-        let m = SE3::new(&SO3::from_euler_angles(0., 0., FRAC_PI_2), [1., 1., 0.]);
-        assert_abs_diff_eq!(m, res);
-        println!("{:}", res);
-    }
-
-    #[test]
-    fn test_ik() {
-        let m = (Vec6::new([0., 0., 0.], [1., 0., 0.]) * 2.).hat().exp();
-        let s_list = [
-            Vec6::new([0., 0., 1.], [0., 0., 0.]),
-            Vec6::new([0., 0., 1.], [0., -1., 0.]),
-        ];
-        let mut theta_list = [0., FRAC_PI_2];
-        let target = SE3::new(&SO3::from_euler_angles(0., 0., FRAC_PI_2), [1., 1., 0.]);
-        let res = ik(
-            &m,
-            &s_list,
-            &mut theta_list,
-            &target,
-            IkSolveParam::default(),
-        );
-        // assert_eq!(res, Ok(()));
+    fn test_ad() {
+        let v = se3::new([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]);
+        let res = ad(v);
+        println!("{}", res);
     }
 }

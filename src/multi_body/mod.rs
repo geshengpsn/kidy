@@ -4,13 +4,71 @@ use std::{
 };
 
 use liealg::prelude::*;
+use nalgebra::{Matrix3, Matrix6};
 use petgraph::visit::Bfs;
 use urdf_rs::read_file;
 
 #[derive(Debug, Clone)]
+struct Inertia {
+    mass: f64,
+    inertia: RotateInertia,
+}
+
+#[derive(Debug, Clone)]
+struct RotateInertia {
+    xx: f64,
+    yy: f64,
+    zz: f64,
+    xy: f64,
+    xz: f64,
+    yz: f64,
+}
+
+impl Inertia {
+    fn from_link(link: &urdf_rs::Link) -> Inertia {
+        Inertia::new(
+            link.inertial.mass.value,
+            RotateInertia {
+                xx: link.inertial.inertia.ixx,
+                yy: link.inertial.inertia.iyy,
+                zz: link.inertial.inertia.izz,
+                xy: link.inertial.inertia.ixy,
+                xz: link.inertial.inertia.ixz,
+                yz: link.inertial.inertia.iyz,
+            },
+        )
+    }
+
+    fn new(mass: f64, inertia: RotateInertia) -> Inertia {
+        Inertia { mass, inertia }
+    }
+
+    fn spatial_inertia(&self) -> Matrix6<f64> {
+        let mut res = Matrix6::zeros();
+        res.fixed_view_mut::<3, 3>(0, 0).copy_from(&Matrix3::new(
+            self.inertia.xx,
+            self.inertia.xy,
+            self.inertia.xz,
+            self.inertia.xy,
+            self.inertia.yy,
+            self.inertia.yz,
+            self.inertia.xz,
+            self.inertia.yz,
+            self.inertia.zz,
+        ));
+        res.fixed_view_mut::<3, 3>(3, 3)
+            .copy_from(&Matrix3::from_diagonal_element(self.mass));
+        res
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Link {
     pub space_screw: Option<liealg::se3<f64>>,
+    pub local_screw: Option<liealg::se3<f64>>,
+    pub local_zero_pose: liealg::SE3<f64>,
     pub global_zero_pose: liealg::SE3<f64>,
+    pub local_spatial_inertial: Matrix6<f64>,
 
     pub joint: Option<urdf_rs::Joint>,
     pub urdf_link: urdf_rs::Link,
@@ -62,7 +120,7 @@ impl MultiBody {
             .collect()
     }
 
-    pub fn get_kidy_chain<const N:usize>(&self, start: &str, end: &str) -> KidyChain<N> {
+    pub fn get_kidy_chain<const N: usize>(&self, start: &str, end: &str) -> KidyChain<N> {
         let mut chain = vec![];
         let start = self
             .link_map
@@ -99,14 +157,38 @@ impl MultiBody {
             .iter()
             .filter_map(|link| link.space_screw.clone())
             .collect();
-        let zero_poses = chain
-            .iter()
-            .map(|link| link.global_zero_pose.clone())
-            .collect();
         assert_eq!(joints_screw.len(), N);
+        let zero_pose = chain[0].global_zero_pose.clone();
+        let local_screw = chain
+            .iter()
+            .filter_map(|link| link.local_screw.clone())
+            .collect();
+        // assert_eq!(local_screw.len(), N);
+        let mut local_zero_pose: Vec<_> = chain
+            .iter()
+            .filter(|l| match &l.joint {
+                Some(j) => j.joint_type != urdf_rs::JointType::Fixed,
+                None => true,
+            })
+            .map(|link| link.local_zero_pose.clone())
+            .collect();
+        local_zero_pose.push(chain.last().unwrap().local_zero_pose.clone());
+
+        let local_spatial_inertial = chain
+            .iter()
+            .filter(|l| match &l.joint {
+                Some(j) => j.joint_type != urdf_rs::JointType::Fixed,
+                None => true,
+            })
+            .map(|link| link.local_spatial_inertial)
+            .collect();
+
         KidyChain {
             joints_screw,
-            zero_poses,
+            zero_pose,
+            local_screw,
+            local_zero_pose,
+            local_spatial_inertial,
         }
     }
 }
@@ -176,7 +258,10 @@ fn parse_robot(robot: urdf_rs::Robot) -> MultiBody {
                 i,
                 Link {
                     space_screw: None,
+                    local_screw: None,
                     global_zero_pose: liealg::SE3::identity(),
+                    local_zero_pose: liealg::SE3::identity(),
+                    local_spatial_inertial: Inertia::from_link(&l).spatial_inertia(),
                     urdf_link: l,
                     joint: j,
                 },
@@ -203,12 +288,15 @@ fn parse_robot(robot: urdf_rs::Robot) -> MultiBody {
                 .clone();
             let relative_pose =
                 joint_relative_pose(multi_body.get_link(link).unwrap().joint.as_ref().unwrap());
+            multi_body.get_mut_link(link).local_zero_pose = relative_pose.clone();
+
             let global_pose = parent_global_pose * relative_pose;
             multi_body.get_mut_link(link).global_zero_pose = global_pose.clone();
 
             if let Some(screw) =
                 joint_screw(multi_body.get_link(link).unwrap().joint.as_ref().unwrap())
             {
+                multi_body.get_mut_link(link).local_screw = Some(screw.clone());
                 let global_screw = global_pose.adjoint().act(&screw);
                 multi_body.get_mut_link(link).space_screw = Some(global_screw);
             }
@@ -245,43 +333,67 @@ fn origin_to_se3(origin: &urdf_rs::Pose) -> liealg::SE3<f64> {
     liealg::SE3::new(&liealg::SO3::from_euler_angles(rpy[0], rpy[1], rpy[2]), xyz)
 }
 
-// fn relative_pose(joint: &urdf_rs::Joint, joint_value: f64) -> liealg::SE3<f64> {
-//     let pose = joint_relative_pose(joint);
-//     let screw = joint_screw(joint);
-//     if let Some(screw) = screw {
-//         pose * (screw * joint_value).exp()
-//     } else {
-//         liealg::SE3::identity()
-//     }
-// }
-
 #[derive(Debug)]
-pub struct KidyChain<const N:usize> {
+pub struct KidyChain<const N: usize> {
     // pub(crate) value: Vec<Link>,
     pub(crate) joints_screw: Vec<liealg::se3<f64>>,
-    pub(crate) zero_poses: Vec<liealg::SE3<f64>>,
-}
-
-impl<const N:usize> KidyChain<N> {
-    pub fn zero_ee_pose(&self) -> liealg::SE3<f64> {
-        self.zero_poses.last().unwrap().clone()
-    }
+    pub(crate) zero_pose: liealg::SE3<f64>,
+    pub(crate) local_screw: Vec<liealg::se3<f64>>,
+    
+    pub(crate) local_zero_pose: Vec<liealg::SE3<f64>>,
+    pub(crate) local_spatial_inertial: Vec<Matrix6<f64>>,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-
+    #[test]
+    fn test_inertia() {
+        let inertia = Inertia::new(
+            1.0,
+            RotateInertia {
+                xx: 1.0,
+                yy: 2.0,
+                zz: 3.0,
+                xy: 4.0,
+                xz: 5.0,
+                yz: 6.0,
+            },
+        );
+        let spatial_inertia = inertia.spatial_inertia();
+        println!("{}", spatial_inertia);
+        assert_eq!(spatial_inertia[(0, 0)], 1.0);
+        assert_eq!(spatial_inertia[(1, 1)], 2.0);
+        assert_eq!(spatial_inertia[(2, 2)], 3.0);
+        assert_eq!(spatial_inertia[(3, 3)], 1.0);
+        assert_eq!(spatial_inertia[(4, 4)], 1.0);
+        assert_eq!(spatial_inertia[(5, 5)], 1.0);
+    }
     #[test]
     fn test_from_urdf() {
         let multi_body =
             MultiBody::from_urdf("urdf/franka_description/robots/franka_panda.urdf").unwrap();
         let chain = multi_body.get_kidy_chain::<7>("panda_link0", "panda_hand");
 
-        for p in chain.joints_screw {
-            println!("{:.3}", p.vee());
+        // N
+        // for p in chain.joints_screw {
+        //     println!("{:.3}", p.vee());
+        // }
+
+        // N
+        // for p in chain.local_screw {
+        //     println!("{:.3}", p.vee());
+        // }
+
+        // N + 1
+        for p in chain.local_zero_pose {
+            println!("{:.3}", p);
         }
-        // println!("{:?}", chain.zero_poses);
+
+        // N + 1
+        for p in chain.local_spatial_inertial {
+            println!("{:.3}", p);
+        }
         // println!("{:.3}", chain.zero_ee_pose());
     }
 }
