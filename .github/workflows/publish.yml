@@ -1,0 +1,27 @@
+name: release
+on:
+  push:
+    branches:
+      - publish
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  override: true
+                
+            - name: Run tests
+              run: cargo test
+
+            - name: Lint
+              run: cargo clippy
+
+            - name: Check formatting
+              run: cargo fmt --check
+
+            - uses: katyo/publish-crates@v2
+              with:
+                  registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
