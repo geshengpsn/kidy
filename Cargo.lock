@@ -80,9 +80,9 @@ dependencies = [
 
 [[package]]
 name = "liealg"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71817f43df4d4c525218610d619979f75667a89e6857acd128456c2083c47a2f"
+checksum = "3dc16aa0a6fe4d3fca17464e09aa2a30f840b197130c1cbe85be4093060955c8"
 dependencies = [
  "approx",
  "nalgebra",
