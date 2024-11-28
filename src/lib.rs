@@ -9,4 +9,6 @@ mod dynamics;
 mod kinematics;
 mod multi_body;
 
+// re-export liealg
+pub use liealg;
 pub use multi_body::{MultiBody, Link, KidyChain};
