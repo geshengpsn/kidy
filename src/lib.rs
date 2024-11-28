@@ -11,4 +11,4 @@ mod multi_body;
 
 // re-export liealg
 pub use liealg;
-pub use multi_body::{MultiBody, Link, KidyChain};
+pub use multi_body::{KidyChain, Link, MultiBody};

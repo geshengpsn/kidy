@@ -339,7 +339,7 @@ pub struct KidyChain<const N: usize> {
     pub(crate) joints_screw: Vec<liealg::se3<f64>>,
     pub(crate) zero_pose: liealg::SE3<f64>,
     pub(crate) local_screw: Vec<liealg::se3<f64>>,
-    
+
     pub(crate) local_zero_pose: Vec<liealg::SE3<f64>>,
     pub(crate) local_spatial_inertial: Vec<Matrix6<f64>>,
 }
