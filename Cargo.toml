@@ -2,7 +2,13 @@
 name = "kidy"
 version = "0.1.0"
 edition = "2021"
-
+license = "MIT"
+description = "kidy is a library for kinematics and dynamics of multi-body."
+documentation = "https://docs.rs/kidy"
+homepage = "https://github.com/geshengpsn/kidy"
+repository = "https://github.com/geshengpsn/kidy"
+readme = "readme.md"
+keywords = ["math", "science", "robotics"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
