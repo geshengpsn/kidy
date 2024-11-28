@@ -118,10 +118,10 @@ mod test {
         let (joints, iter_time) = chain
             .ik(&target, &init_joints, 1e-6, 1e-6, 1e-6, 10)
             .unwrap();
-        // println!("{joints:?} {iter_time}");
+        println!("{joints:?} {iter_time}");
 
-        // let res = chain.fk(&joints);
-        // println!("{res:.7}");
-        // assert_relative_eq!(res, target, epsilon = 1e-6);
+        let res = chain.fk(&joints);
+        println!("{res:.7}");
+        assert_relative_eq!(res, target, epsilon = 1e-6);
     }
 }

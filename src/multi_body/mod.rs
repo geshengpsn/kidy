@@ -158,7 +158,7 @@ impl MultiBody {
             .filter_map(|link| link.space_screw.clone())
             .collect();
         assert_eq!(joints_screw.len(), N);
-        let zero_pose = chain[0].global_zero_pose.clone();
+        let zero_pose = chain.last().unwrap().global_zero_pose.clone();
         let local_screw = chain
             .iter()
             .filter_map(|link| link.local_screw.clone())
