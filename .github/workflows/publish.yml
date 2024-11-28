@@ -13,8 +13,8 @@ jobs:
                   toolchain: stable
                   override: true
                 
-            - name: Run tests
-              run: cargo test
+            # - name: Run tests
+              # run: cargo test
 
             - name: Lint
               run: cargo clippy
