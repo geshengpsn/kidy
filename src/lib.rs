@@ -5,10 +5,12 @@
 // #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-mod dynamics;
-mod kinematics;
-mod multi_body;
+mod model;
+pub use model::*;
 
-// re-export liealg
-pub use liealg;
-pub use multi_body::{KidyChain, Link, MultiBody};
+mod kinematics;
+pub use kinematics::*;
+
+mod dynamics;
+pub mod visual;
+// pub use liealg;
