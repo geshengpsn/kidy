@@ -11,11 +11,11 @@ readme = "readme.md"
 keywords = ["math", "science", "robotics"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[workspace]
-resolver = "3"
-members = [
-    "crates/model_parser",
-]
+# [workspace]
+# resolver = "3"
+# members = [
+#     "crates/model_parser",
+# ]
 
 [dependencies]
 spatial_alg = { git = "https://github.com/geshengpsn/spatial_alg" }
@@ -24,7 +24,7 @@ nalgebra = "0.33.2"
 petgraph = "0.8.2"
 urdf-rs = "0.9.0"
 reqwest = { version = "0.12", features = ["blocking"] }
-hashbrown = "0.15.4"
+hashbrown = "0.15.5"
 rerun = "0.24.1"
 obj-rs = "0.7.4"
 color-name = "1.1.0"
@@ -36,7 +36,7 @@ rand = "0.9.2"
 opt-level = 3
 
 [dev-dependencies]
-criterion = { version = "0.6.0", features = ["html_reports"] }
+criterion = { version = "0.7.0", features = ["html_reports"] }
 
 [[bench]]
 name = "fk"

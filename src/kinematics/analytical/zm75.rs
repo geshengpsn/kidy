@@ -102,8 +102,9 @@ impl ZM75AIKSolevr {
         for j4 in [j4_a, j4_b].into_iter().flatten() {
             let joint6_t_robot = robot_t_joint6.inv();
             let shoulder_point_homo = self.robot_shoulder_point.push(1.);
-            let joint6_shoulder_point = (joint6_t_robot * shoulder_point_homo).fixed_view::<3, 1>(0, 0);
-            
+            let joint6_shoulder_point =
+                (joint6_t_robot * shoulder_point_homo).fixed_view::<3, 1>(0, 0);
+
             for i in [1, 2] {}
         }
 
