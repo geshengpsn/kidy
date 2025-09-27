@@ -47,8 +47,7 @@ impl Model {
             };
             let parent_poe = poes[parent_index];
             poes[*link_index] = parent_poe * log_twists[*link_index];
-            link_poses[*link_index] =
-                poes[*link_index] * self.links[*link_index].global_zero_pose;
+            link_poses[*link_index] = poes[*link_index] * self.links[*link_index].global_zero_pose;
         }
         link_poses
     }
@@ -83,8 +82,7 @@ impl Model {
                 .copy_from_slice(jn.as_slice());
 
             poes[*link_index] = parent_poe * log_twists[*link_index];
-            link_poses[*link_index] =
-                poes[*link_index] * self.links[*link_index].global_zero_pose;
+            link_poses[*link_index] = poes[*link_index] * self.links[*link_index].global_zero_pose;
         }
         (jacobian, link_poses)
     }

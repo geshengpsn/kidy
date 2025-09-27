@@ -14,3 +14,5 @@ pub use kinematics::*;
 mod dynamics;
 pub mod visual;
 // pub use liealg;
+
+mod algo;

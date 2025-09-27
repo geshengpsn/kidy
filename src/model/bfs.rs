@@ -7,7 +7,9 @@ struct BfsIter<'a> {
     bfs: Bfs<usize, HashSet<usize>>,
 }
 
-impl Iterator for BfsIter<'_> {
+impl Iterator for BfsIter<'_> 
+
+{
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
