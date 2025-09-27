@@ -8,7 +8,6 @@ impl Model {
     pub fn from_urdf_string(str: &str) -> std::io::Result<Self> {
         // construct a Model from robot
         let robot = read_from_string(str).map_err(std::io::Error::other)?;
-
         // parent_link_name -> (link_id, joint, link)
         // put joint and link together
         let temp_map = temp_link_map(robot);

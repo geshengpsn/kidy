@@ -4,8 +4,8 @@ use crate::model::utils::pose_to_se3;
 use crate::Model;
 use nalgebra::Matrix4;
 use rerun::{
-    components::Translation3D, datatypes::UVec3D, Arrows3D, Asset3D, Color, Mat3x3, Mesh3D,
-    Position3D, Scale3D, Transform3D, TriangleIndices, Vec3D,
+    components::Translation3D, datatypes::UVec3D, Arrows3D, Asset3D, Boxes3D, Color, Mat3x3,
+    Mesh3D, Position3D, Quaternion, Scale3D, Transform3D, TriangleIndices, Vec3D,
 };
 use urdf_rs::Vec3;
 
@@ -18,6 +18,7 @@ pub struct RerunVisualizer<'a> {
 impl<'a> RerunVisualizer<'a> {
     pub fn new(id: &str, package_dir: &str, model: &'a Model) -> Self {
         let rerun = rerun::RecordingStreamBuilder::new(id).spawn().unwrap();
+        // rerun.log(ent_path, as_components)
         rerun.set_time("timeline", std::time::SystemTime::now());
         let mut viewer = Self {
             rerun,
@@ -94,7 +95,9 @@ impl<'a> RerunVisualizer<'a> {
                 let filename = if filename.starts_with("package://") {
                     filename.replace("package://", &self.package_dir)
                 } else {
-                    filename.clone()
+                    let mut f = filename.clone();
+                    f.insert_str(0, &self.package_dir);
+                    f
                 };
                 println!("filename: {:?}", filename);
 
@@ -175,6 +178,87 @@ impl<'a> RerunVisualizer<'a> {
                     )]),
                 )
                 .unwrap();
+        }
+
+        for (i, collision) in link.collision.iter().enumerate() {
+            let entity_path = link_name.clone() + "/" + &format!("collision_{}", i);
+            if let urdf_rs::Geometry::Box { size } = &collision.geometry {
+                let pose = pose_to_se3(&collision.origin);
+                let rot = pose.fixed_view::<3, 3>(0, 0);
+                let trans = pose.fixed_view::<3, 1>(0, 3);
+                let f32_array = [
+                    rot[(0, 0)] as f32,
+                    rot[(1, 0)] as f32,
+                    rot[(2, 0)] as f32,
+                    rot[(0, 1)] as f32,
+                    rot[(1, 1)] as f32,
+                    rot[(2, 1)] as f32,
+                    rot[(0, 2)] as f32,
+                    rot[(1, 2)] as f32,
+                    rot[(2, 2)] as f32,
+                ];
+                self.rerun
+                    .log(
+                        "/".to_string() + &entity_path,
+                        &Transform3D::from_translation_mat3x3(
+                            Translation3D::new(trans[0] as f32, trans[1] as f32, trans[2] as f32),
+                            Mat3x3::from(f32_array),
+                        ),
+                    )
+                    .unwrap();
+                self.rerun
+                    .log(
+                        "/".to_string() + &entity_path,
+                        &Boxes3D::from_sizes([size.0]),
+                    )
+                    .unwrap();
+            }
+
+            if let urdf_rs::Geometry::Mesh { filename, scale } = &collision.geometry {
+                let filename = if filename.starts_with("package://") {
+                    filename.replace("package://", &self.package_dir)
+                } else {
+                    let mut f = filename.clone();
+                    f.insert_str(0, &self.package_dir);
+                    f
+                };
+                println!("collision stl: {:?}", filename);
+                let scale = scale.unwrap_or(Vec3([1.0, 1.0, 1.0]));
+                let pose = pose_to_se3(&collision.origin);
+                let rot = pose.fixed_view::<3, 3>(0, 0);
+                let trans = pose.fixed_view::<3, 1>(0, 3);
+                let f32_array = [
+                    rot[(0, 0)] as f32,
+                    rot[(1, 0)] as f32,
+                    rot[(2, 0)] as f32,
+                    rot[(0, 1)] as f32,
+                    rot[(1, 1)] as f32,
+                    rot[(2, 1)] as f32,
+                    rot[(0, 2)] as f32,
+                    rot[(1, 2)] as f32,
+                    rot[(2, 2)] as f32,
+                ];
+                self.rerun
+                    .log(
+                        "/".to_string() + &entity_path,
+                        &Transform3D::from_translation_mat3x3(
+                            Translation3D::new(trans[0] as f32, trans[1] as f32, trans[2] as f32),
+                            Mat3x3::from(f32_array),
+                        )
+                        .with_scale(Vec3D::new(
+                            scale.0[0] as f32,
+                            scale.0[1] as f32,
+                            scale.0[2] as f32,
+                        )),
+                    )
+                    .unwrap();
+                self.rerun
+                    .log(
+                        "/".to_string() + &entity_path,
+                        &Asset3D::from_file_path(filename).unwrap(),
+                    )
+                    .unwrap();
+            }
         }
     }
 }
