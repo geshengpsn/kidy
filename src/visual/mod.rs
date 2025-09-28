@@ -5,7 +5,7 @@ use crate::Model;
 use nalgebra::Matrix4;
 use rerun::{
     components::Translation3D, datatypes::UVec3D, Arrows3D, Asset3D, Boxes3D, Color, Mat3x3,
-    Mesh3D, Position3D, Quaternion, Scale3D, Transform3D, TriangleIndices, Vec3D,
+    Mesh3D, Position3D, Scale3D, Transform3D, TriangleIndices, Vec3D,
 };
 use urdf_rs::Vec3;
 
@@ -115,15 +115,20 @@ impl<'a> RerunVisualizer<'a> {
                             panic!("only support triangle mesh")
                         }
                     });
-                    let color = visual
-                        .material
-                        .as_ref()
-                        .map(|m| {
-                            color_name::Color::val()
-                                .by_string(m.name.clone())
-                                .unwrap_or(color_name::colors::white)
-                        })
-                        .unwrap_or(color_name::colors::white);
+                    let color = visual.material.as_ref().map(|m| {
+                        // color_name::css::Color::val()
+                        //     .by_string(m.name.clone())
+                        //     .unwrap_or(color_name::colors::white)
+
+                        m.color.clone()
+                            .map_or([255, 255, 255], |c| {
+                                [
+                                    ((c.rgba.0[0] * 255.) as u8),
+                                    ((c.rgba.0[1] * 255.) as u8),
+                                    ((c.rgba.0[2] * 255.) as u8),
+                                ]
+                            })
+                    }).unwrap_or([255, 255, 255]);
                     self.rerun
                         .log(
                             "/".to_string() + &entity_path,

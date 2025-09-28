@@ -1,7 +1,5 @@
 use nalgebra::{Matrix4, Vector6};
 
-
-
 // fk
 fn fk(link_zero_pose: &Matrix4<f64>, twists_se3: &[Matrix4<f64>], twists_se3_sq: &[Matrix4<f64>], joints: &[f64])
 {

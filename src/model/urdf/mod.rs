@@ -15,7 +15,7 @@ impl Model {
         // find start that has no parent link
         let start = temp_map
             .iter()
-            .find(|(k, _)| k.is_none())
+            .find(|(parent_link_name, _)| parent_link_name.is_none())
             .map(|(_, v)| v.0)
             .unwrap_or(0);
 

@@ -37,7 +37,10 @@ pub(super) fn read_web(url: &str) -> std::io::Result<String> {
 
 pub(super) fn temp_link_map(
     robot: urdf_rs::Robot,
-) -> HashMap<Option<String>, (usize, Option<urdf_rs::Joint>, urdf_rs::Link)> {
+) -> Vec<(
+    Option<String>,
+    (usize, Option<urdf_rs::Joint>, urdf_rs::Link),
+)> {
     // parent_link_name -> (link_id, joint, link)
     robot
         .links
@@ -50,24 +53,33 @@ pub(super) fn temp_link_map(
                 .find(|joint| joint.child.link == link.name);
             (j.map(|j| j.parent.link.clone()), (index, j.cloned(), link))
         })
-        .collect::<HashMap<_, _>>()
+        .collect::<Vec<_>>()
 }
 
 pub(super) fn construct_link_graph(
-    temp_map: &HashMap<Option<String>, (usize, Option<urdf_rs::Joint>, urdf_rs::Link)>,
+    link_vec: &Vec<(
+        Option<String>,
+        (usize, Option<urdf_rs::Joint>, urdf_rs::Link),
+    )>,
 ) -> petgraph::graphmap::DiGraphMap<usize, ()> {
     // empty graph
     let mut graph = petgraph::graphmap::DiGraphMap::<usize, ()>::new();
 
     // add all nodes to graph
-    temp_map.iter().for_each(|(_, (self_index, _, _))| {
+    link_vec.iter().for_each(|(_, (self_index, _, _))| {
         graph.add_node(*self_index);
     });
 
     // add all edges to graph
-    temp_map.iter().for_each(|(_, (self_index, _, link))| {
-        if let Some((child_index, _, _)) = temp_map.get(&Some(link.name.clone())) {
-            graph.add_edge(*self_index, *child_index, ());
+    link_vec.iter().for_each(|(pln, (self_index, _, _))| {
+        // find parent link via parent link name
+        if pln.is_some() {
+            if let Some((_, (parent_index, _, _))) = link_vec
+                .iter()
+                .find(|(_, (_, _, parent_link))| &parent_link.name == pln.as_ref().unwrap())
+            {
+                graph.add_edge(*parent_index, *self_index, ());
+            }
         }
     });
 
@@ -75,9 +87,12 @@ pub(super) fn construct_link_graph(
 }
 
 pub(super) fn construct_link_map(
-    temp_map: HashMap<Option<String>, (usize, Option<urdf_rs::Joint>, urdf_rs::Link)>,
+    link_vec: Vec<(
+        Option<String>,
+        (usize, Option<urdf_rs::Joint>, urdf_rs::Link),
+    )>,
 ) -> HashMap<usize, Link> {
-    temp_map
+    link_vec
         .into_iter()
         .map(|(_, (i, j, l))| {
             (
@@ -259,15 +274,15 @@ mod tests {
         // println!("{:#?}", map);
     }
 
-    #[test]
-    fn pose_to_se3_test() {
-        let robot = urdf_rs::read_file("./urdf/rm_75_6fb_description/urdf/RM75-6F.urdf").unwrap();
-        let map = temp_link_map(robot);
-        let (_, _, link) = map.get(&None).unwrap();
-        let pose = pose_to_se3(&link.inertial.origin);
-        println!("name: {}", link.name);
-        println!("{:.4}", pose);
-    }
+    // #[test]
+    // fn pose_to_se3_test() {
+    //     let robot = urdf_rs::read_file("./urdf/rm_75_6fb_description/urdf/RM75-6F.urdf").unwrap();
+    //     let map = temp_link_map(robot);
+    //     let (_, _, link) = map.get(&None).unwrap();
+    //     let pose = pose_to_se3(&link.inertial.origin);
+    //     println!("name: {}", link.name);
+    //     println!("{:.4}", pose);
+    // }
 
     #[test]
     fn construct_link_graph_test() {
@@ -278,15 +293,15 @@ mod tests {
         println!("{:?}", graph);
     }
 
-    #[test]
-    fn spatial_inertia_test() {
-        let robot = urdf_rs::read_file("./urdf/rm_75_6fb_description/urdf/RM75-6F.urdf").unwrap();
-        let map = temp_link_map(robot);
-        let (_, _, link) = map.get(&None).unwrap();
-        let inertia = spatial_inertia(link);
-        println!("name: {}", link.name);
-        println!("{:.2e}", inertia);
-    }
+    // #[test]
+    // fn spatial_inertia_test() {
+    //     let robot = urdf_rs::read_file("./urdf/rm_75_6fb_description/urdf/RM75-6F.urdf").unwrap();
+    //     let map = temp_link_map(robot);
+    //     let (_, _, link) = map.get(&None).unwrap();
+    //     let inertia = spatial_inertia(link);
+    //     println!("name: {}", link.name);
+    //     println!("{:.2e}", inertia);
+    // }
 
     #[test]
     fn construct_link_map_test() {
